@@ -7,8 +7,8 @@ def create_window(theme):
     layout = [
         [sg.Text("Output", key="-TEXT-",font="Franklin 25",justification="center",expand_x=True,pad=(10,20),right_click_menu=themes)],
         [sg.Button("Enter" ,key="-ENTER-",expand_x=True), sg.Button("CLR", key="-CLEAR-",expand_x=True)],
-        [sg.Button(7, size=(6,3)), sg.Button(8, size=(6,3)), sg.Button(9, size=(6,3)), sg.Button("x", size=(6,3))],
-        [sg.Button(4, size=(6,3)), sg.Button(5, size=(6,3)), sg.Button(6, size=(6,3)), sg.Button("÷", size=(6,3))],
+        [sg.Button(7, size=(6,3)), sg.Button(8, size=(6,3)), sg.Button(9, size=(6,3)), sg.Button("*", size=(6,3))],
+        [sg.Button(4, size=(6,3)), sg.Button(5, size=(6,3)), sg.Button(6, size=(6,3)), sg.Button("/", size=(6,3))],
         [sg.Button(1, size=(6,3)), sg.Button(2, size=(6,3)), sg.Button(3, size=(6,3)), sg.Button("-", size=(6,3))],
         [sg.Button(0, expand_x=True), sg.Button(".", expand_x=True), sg.Button("+", size=(6,3))]
     ]
@@ -35,7 +35,7 @@ while True:
         num_string = ''.join(current)
         window["-TEXT-"].update(num_string)
 
-    if event in ["+","x","-","÷"]:
+    if event in ["+","*","-","/"]:
         operations.append(''.join(current))
         current = []
         operations.append(event)
