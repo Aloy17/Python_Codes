@@ -1,3 +1,18 @@
+'''
+# Hangman Game
+
+# Description
+-This file creates a simple hangman game
+-The output would be one of the many words stored in the "words.py" file
+-The player must guess all the letters of the chosen words, where each wrong word would cost a life
+-The game ends when the player either guesses the word or loses all their lives
+
+# Usage
+-In the "words.py" file exists a list of words, edit those list to add words according to your choice
+-Add a hint in that file as well, this will be imported to the file we're on.
+-Run this script, type a single letter, the program will give you an output of whether you're correct or not
+'''
+
 import words
 import time
 import random
