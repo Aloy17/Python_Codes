@@ -17,7 +17,7 @@ print_stmt     → "out" "(" expression ")" ;
 
 input_stmt     → IDENTIFIER "=" "in" "("? STRING? ")"? ;
 
-expression     → term (("+" | "-" | "*" | "/") term)* ;
+expression     → term (("+" | "-" | "*" | "/" | "%")) term)* ;
 
 term           → NUMBER
                | STRING
