@@ -35,7 +35,6 @@ DELIMITERS = {
     "}": "RBRACE"
 }
 
-# 4️⃣ Token Types for special categories (optional, for convenience)
 TOKEN_TYPES = [
     "IDENTIFIER",   # variable or function names
     "NUMBER",       # integer or float
@@ -45,7 +44,7 @@ TOKEN_TYPES = [
 
 
 
-# 5️⃣ Utility: check if a word is a keyword
+
 def get_keyword_token(word):
     return KEYWORDS.get(word, "IDENTIFIER")
 
