@@ -45,7 +45,7 @@ class Parser:
                     value = value_token[0]
                     if value_token[1] == "STRING":
                         value = f'"{value}"'
-                    self.output.append(f'{var_name} = "{value}"')
+                    self.output.append(f'{var_name} = {value}')
                     self.symbols[var_name] = value
                     self.position += 1
                 else:
@@ -70,15 +70,15 @@ class Parser:
                 if value_token[1] in ("NUMBER","BOOL"):
                     value = value_token[0]
                 elif value_token[1] == "STRING":
-                    value = f'"{value_token[0]}'
+                    value = f'"{value_token[0]}"'
                 elif value_token[1] == "IDENTIFIER":
-                    if value_token[0] in self.symboles:
+                    if value_token[0] in self.symbols:
                         value = value_token[0]
                     else:
                         raise Exception(f"Variable '{value_token[0]}' not declared")
                 else:
                     raise Exception("Unsupported value type for assignment")
-                self.symbols[var_name] = value_token[0]
+                self.symbols[var_name] = value
                 self.output.append(f"{var_name} = {value}")
                 self.position+=1
         else:
@@ -116,12 +116,27 @@ class Parser:
                     raise Exception("Error, syntax incomplete")
 
 
-
-
-
-
     def input_stmt(self,current_token):
-        pass
+        self.position+=1
+        paren_token = self.token[self.position]
+
+        if paren_token[1] == "LPAREN":
+            self.position+=1
+
+            value_token = self.token[self.position]
+
+            if value_token[1] == "IDENTIFIER":
+                value = f"{value_token[0]}"
+                self.output.append(f'{value} = input()')
+                self.position+=1
+
+                paren_token = self.token[self.position]
+                if paren_token[1] == "RPAREN":
+                    self.position+=1
+                else:
+                    raise Exception("Error, syntax incomplete")
+
+
 
     def loop_stmt(self,current_token):
         pass
