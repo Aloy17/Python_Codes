@@ -4,7 +4,9 @@ from logging import exception
 class Parser:
     def __init__(self,token):
         self.token = token
+        self.output = []
         self.symbols = {}
+        self.transpiled_code = []
         self.position = 0
         self.handlers = {
             "LET": self.var_declare,
@@ -25,7 +27,6 @@ class Parser:
             token_type = current_token[1]
             handler = self.handlers.get(token_type,self.unknown_token)
             handler(current_token)
-            self.position+=1
 
     def var_declare(self,current_token):
         self.position+=1
@@ -41,7 +42,18 @@ class Parser:
                 value_token = self.token[self.position]
 
                 if value_token[1] in ("NUMBER","STRING","BOOL"):
-                    self.symbols[var_name] = value_token[0]
+                    value = value_token[0]
+                    if value_token[1] == "STRING":
+                        value = f'"{value}"'
+                    self.output.append(f'{var_name} = "{value}"')
+                    self.symbols[var_name] = value
+                    self.position += 1
+                else:
+                    raise Exception("Invalid value type in declaration")
+            else:
+                raise Exception("Expected '=' after identifier")
+        else:
+            raise Exception("Expected identifier after 'let'")
 
 
     def assignment(self,current_token):
@@ -55,14 +67,58 @@ class Parser:
                 self.position+=1
                 value_token = self.token[self.position]
 
-                if value_token[1] in ("NUMBER","STRING","BOOL"):
-                    self.symbols[var_name] = value_token[0]
-                    self.position+=1
+                if value_token[1] in ("NUMBER","BOOL"):
+                    value = value_token[0]
+                elif value_token[1] == "STRING":
+                    value = f'"{value_token[0]}'
+                elif value_token[1] == "IDENTIFIER":
+                    if value_token[0] in self.symboles:
+                        value = value_token[0]
+                    else:
+                        raise Exception(f"Variable '{value_token[0]}' not declared")
+                else:
+                    raise Exception("Unsupported value type for assignment")
+                self.symbols[var_name] = value_token[0]
+                self.output.append(f"{var_name} = {value}")
+                self.position+=1
         else:
             raise Exception(f"Variable '{var_name}' not declared")
 
     def print_stmt(self,current_token):
-        pass
+            self.position+=1
+            paren_token = self.token[self.position]
+
+            if paren_token[1] == "LPAREN":
+                self.position+=1
+                value_token = self.token[self.position]
+
+                if value_token[1] in ("NUMBER","BOOL"):
+                    value = value_token[0]
+
+                elif value_token[1] == "STRING":
+                    value = f'"{value_token[0]}"'
+
+                elif value_token[1] == "IDENTIFIER":
+                    if value_token[0] in self.symbols:
+                        value = value_token[0]
+                    else:
+                        raise Exception("Error, undefined variable")
+                else:
+                    raise Exception("Unexpected datatype")
+
+                self.output.append(f'print({value})')
+                self.position+=1
+
+                paren_token = self.token[self.position]
+                if paren_token[1] == "RPAREN":
+                    self.position+=1
+                else:
+                    raise Exception("Error, syntax incomplete")
+
+
+
+
+
 
     def input_stmt(self,current_token):
         pass
@@ -109,3 +165,4 @@ parser = Parser(token)
 
 parser.parse()
 print(parser.symbols)
+print(parser.output)
