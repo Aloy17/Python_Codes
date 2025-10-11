@@ -24,12 +24,14 @@ term           → NUMBER
                | IDENTIFIER
                | "(" expression ")" ;
 
-loop_stmt      → "Run" "(" condition ")" block
-               | "Run" "if" "(" condition ")" block ;
+loop_stmt → "Run" "(" expression ")" block         ; fixed-count
+           | "Run" "while" "(" condition ")" block ; conditional
 
-conditional_stmt → "agar" "(" condition ")" "toh" block
-                   ("ya fir" "(" condition ")" "toh" block)*
-                   ("warna" "toh" block)? ;
+
+conditional_stmt → "agar" "(" condition ")" block
+                   ("ya_fir" "(" condition ")" block)*
+                   ("warna" block)? ;
+
 
 condition      → expression ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) expression ;
 
