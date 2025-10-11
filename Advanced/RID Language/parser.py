@@ -196,14 +196,76 @@ class Parser:
             raise Exception("Expected '(' or 'while' after 'Run'")
 
     def block(self,current_token):
-        pass
-
+       pass
 
     def conditional_stmt(self,current_token):
-        pass
 
-    def func_def(self,current_token):
-        pass
+        keyword = current_token[1]
+        if keyword not in ("IF", "ELIF", "ELSE"):
+            raise Exception("Expected 'agar', 'ya_fir', or 'warna'")
+
+        self.position += 1
+        cond_str = ""
+
+        if keyword in ("IF", "ELIF"):
+            if self.token[self.position][1] != "LPAREN":
+                raise Exception("Expected '(' after conditional keyword")
+            self.position += 1
+            cond_str = self.condition(self.token[self.position])
+            if self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after condition")
+            self.position += 1
+
+        if self.token[self.position][1] != "LBRACE":
+            raise Exception("Expected '{' to start block")
+        self.position += 1
+
+        block_lines = self.block(current_token)
+
+        if keyword == "IF":
+            self.output.append(f"if {cond_str}:")
+        elif keyword == "ELIF":
+            self.output.append(f"elif {cond_str}:")
+        else:
+            self.output.append("else:")
+
+        for line in block_lines:
+            self.output.append("    " + line)
+
+    def func_def(self, current_token):
+        if current_token[1] == "FUNC":
+            self.position += 1
+            func_name = self.token[self.position][0]
+            self.position += 1
+
+            paren_token = self.token[self.position]
+
+            if paren_token == "LPAREN":
+                self.position += 1
+                parameters = []
+                while self.token[self.position][1] != "RPAREN":
+                    if self.token[self.position][1] == "IDENTIFIER":
+                        parameters.append(self.token[self.position][0])
+                        self.position += 1
+                    elif self.token[self.position][0] == ",":
+                        self.position += 1
+                    else:
+                        raise Exception("Invalid token in function parameters")
+                self.position += 1
+
+                paren_token = self.token[self.position]
+
+                if paren_token[1] == "LBRACE":
+                    block_lines = self.block(paren_token)
+                    params = ",".join(parameters)
+                    self.output.append(f"def {func_name}({params}):")
+                    self.output.extend(["    " + line for line in block_lines])
+                else:
+                    raise Exception("Expected '{' to start function block")
+            else:
+                raise Exception("Expected '(' after function name")
+        else:
+            raise Exception("Expected 'func'")
 
     def func_call(self,current_token):
         pass
@@ -225,7 +287,6 @@ class Parser:
 
     def arg_list(self,current_token):
         pass
-
 
     def unknown_token(self,current_token):
         pass
