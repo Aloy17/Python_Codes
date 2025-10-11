@@ -115,31 +115,89 @@ class Parser:
                 else:
                     raise Exception("Error, syntax incomplete")
 
+    def input_stmt(self, current_token):
+        var_name = current_token[0]
+        self.position += 1
 
-    def input_stmt(self,current_token):
-        self.position+=1
-        paren_token = self.token[self.position]
+        if self.token[self.position][1] != "LPAREN":
+            raise Exception("Expected '(' after 'in'")
 
-        if paren_token[1] == "LPAREN":
-            self.position+=1
+        self.position += 1
+        next_token = self.token[self.position]
 
-            value_token = self.token[self.position]
+        if next_token[1] == "RPAREN":
+            self.output.append(f"{var_name} = input()")
+            self.position += 1
 
-            if value_token[1] == "IDENTIFIER":
-                value = f"{value_token[0]}"
-                self.output.append(f'{value} = input()')
-                self.position+=1
+        elif next_token[1] == "STRING":
+            prompt = f'"{next_token[0]}"'
+            self.position += 1
 
-                paren_token = self.token[self.position]
-                if paren_token[1] == "RPAREN":
-                    self.position+=1
-                else:
-                    raise Exception("Error, syntax incomplete")
+            if self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after input prompt")
 
+            self.output.append(f"{var_name} = input({prompt})")
+            self.position += 1
 
+        else:
+            raise Exception("Invalid syntax in input statement")
 
-    def loop_stmt(self,current_token):
+    def loop_stmt(self, current_token):
+        if current_token[1] != "RUN":
+            raise Exception("Expected 'Run'")
+
+        self.position += 1
+        next_token = self.token[self.position]
+
+        if next_token[1] == "LPAREN":
+            self.position += 1
+            num_token = self.token[self.position]
+
+            if num_token[1] != "NUMBER":
+                raise Exception("Expected number inside Run(..)")
+
+            loop_template = f"for _ in range({num_token[0]}):"
+            self.position += 1
+
+            if self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after loop count")
+            self.position += 1
+
+            if self.token[self.position][1] != "LBRACE":
+                raise Exception("Expected '{' to start loop block")
+            self.position += 1
+
+            block_lines = self.block(current_token)
+            self.output.append(loop_template)
+            self.output.extend(["    " + line for line in block_lines])
+
+        elif next_token[1] == "WHILE":
+            self.position += 1
+            if self.token[self.position][1] != "LPAREN":
+                raise Exception("Expected '(' after 'while'")
+            self.position += 1
+
+            cond = self.condition(self.token[self.position])
+            self.position += 1
+
+            if self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after while condition")
+            self.position += 1
+
+            if self.token[self.position][1] != "LBRACE":
+                raise Exception("Expected '{' to start loop block")
+            self.position += 1
+
+            block_lines = self.block(current_token)
+            self.output.append(f"while {cond}:")
+            self.output.extend(["    " + line for line in block_lines])
+
+        else:
+            raise Exception("Expected '(' or 'while' after 'Run'")
+
+    def block(self,current_token):
         pass
+
 
     def conditional_stmt(self,current_token):
         pass
@@ -168,13 +226,11 @@ class Parser:
     def arg_list(self,current_token):
         pass
 
-    def block(self,current_token):
-        pass
 
     def unknown_token(self,current_token):
         pass
 
-token = [('Let', 'LET'), ('total', 'IDENTIFIER'), ('=', 'ASSIGN'), ('0', 'NUMBER')]
+token = [('Run', 'RUN'), ('(', 'LPAREN'), ('3', 'NUMBER'), (')', 'RPAREN'), ('{', 'LBRACE'), ('out', 'OUT'), ('(', 'LPAREN'), ('Hey', 'STRING'), (')', 'RPAREN'), ('}', 'RBRACE')]
 
 parser = Parser(token)
 
