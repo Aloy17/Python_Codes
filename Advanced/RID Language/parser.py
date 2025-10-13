@@ -303,6 +303,21 @@ class Parser:
     def unknown_token(self, current_token):
         raise Exception(f"Unknown token {current_token}")
 
+    def expression(self, current_token):
+        pass
+
+    def term(self, current_token):
+        pass
+
+    def param_list(self, current_token):
+        pass
+
+    def arg_list(self, current_token):
+        pass
+
+    def unknown_token(self, current_token):
+        raise Exception(f"Unknown token {current_token}")
+
 
 # Test token
 token = [
