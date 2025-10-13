@@ -112,3 +112,5 @@ def lex(words):
             position+=1
 
     return tokens
+
+print(KEYWORDS.keys())

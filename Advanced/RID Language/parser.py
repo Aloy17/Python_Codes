@@ -3,8 +3,9 @@ class Parser:
         self.token = token
         self.output = []
         self.symbols = {}
-        self.transpiled_code = []
+        self.functions = {}
         self.position = 0
+        self.current_params = []
         self.handlers = {
             "LET": self.var_declare,
             "IDENTIFIER": self.assignment,
@@ -91,7 +92,6 @@ class Parser:
         self.output.append(f"print({value})")
 
     def input_stmt(self, current_token):
-        # Correctly expect an identifier after IN
         self.position += 1
         if self.token[self.position][1] != "IDENTIFIER":
             raise Exception("Expected variable name after IN")
@@ -187,10 +187,16 @@ class Parser:
         if self.token[self.position][1] != "LBRACE":
             raise Exception("Expected '{' to start function block")
         self.position += 1
+        # set current parameters
+        self.current_params = parameters
         block_lines = self.block(current_token)
         params = ",".join(parameters)
         self.output.append(f"def {func_name}({params}):")
         self.output.extend(["    " + line for line in block_lines])
+        # store function definition
+        self.functions[func_name] = {"params": parameters, "body": block_lines}
+        # clear current parameters after block
+        self.current_params = []
 
     def block(self, current_token):
         block_lines = []
@@ -241,34 +247,78 @@ class Parser:
         return f"{lhs} {op} {rhs}"
 
     def func_call(self, current_token):
-        pass
+        func_name = current_token[0]
+        if func_name not in self.functions:
+            raise Exception(f"Function '{func_name}' not defined")
+        self.position += 1
+        if self.token[self.position][1] != "LPAREN":
+            raise Exception("Expected '(' after function name")
+        self.position += 1
+        args = []
+        while self.position < len(self.token) and self.token[self.position][1] != "RPAREN":
+            arg_token = self.token[self.position]
+            if arg_token[1] in ("NUMBER", "BOOL"):
+                args.append(str(arg_token[0]))
+            elif arg_token[1] == "STRING":
+                args.append(f'"{arg_token[0]}"')
+            elif arg_token[1] == "IDENTIFIER":
+                if arg_token[0] in self.symbols or arg_token[0] in self.current_params:
+                    args.append(arg_token[0])
+                else:
+                    raise Exception(f"Variable '{arg_token[0]}' not declared")
+            else:
+                raise Exception(f"Unsupported argument type: {arg_token[1]}")
+            self.position += 1
+            if self.position < len(self.token) and self.token[self.position][0] == ",":
+                self.position += 1
+        if self.token[self.position][1] != "RPAREN":
+            raise Exception("Expected ')' after function arguments")
+        self.position += 1
+        call_str = f"{func_name}({', '.join(args)})"
+        self.output.append(call_str)
 
     def return_stmt(self, current_token):
-        pass
-
-    def expression(self, current_token):
-        pass
-
-    def term(self, current_token):
-        pass
-
-    def param_list(self, current_token):
-        pass
-
-    def arg_list(self, current_token):
-        pass
+        if current_token[1] != "RETURN":
+            raise Exception("Error, expected 'give'")
+        self.position += 1
+        expr_parts = []
+        while self.position < len(self.token) and self.token[self.position][1] != "RBRACE":
+            tok = self.token[self.position]
+            if tok[1] == "STRING":
+                expr_parts.append(f'"{tok[0]}"')
+            elif tok[1] in ("NUMBER", "BOOL"):
+                expr_parts.append(str(tok[0]))
+            elif tok[1] == "IDENTIFIER":
+                if tok[0] not in self.symbols and tok[0] not in self.current_params:
+                    raise Exception(f"Undefined variable '{tok[0]}'")
+                expr_parts.append(tok[0])
+            elif tok[1] in ("PLUS", "MINUS", "MUL", "DIV", "MOD"):
+                op_map = {"PLUS":"+","MINUS":"-","MUL":"*","DIV":"/","MOD":"%"}
+                expr_parts.append(op_map[tok[1]])
+            else:
+                break
+            self.position += 1
+        self.output.append(f"return {' '.join(expr_parts)}")
 
     def unknown_token(self, current_token):
         raise Exception(f"Unknown token {current_token}")
 
 
+# Test token
 token = [
-    ('Run', 'RUN'), ('(', 'LPAREN'), ('3', 'NUMBER'), (')', 'RPAREN'),
-    ('{', 'LBRACE'), ('out', 'OUT'), ('(', 'LPAREN'), ('Hey', 'STRING'),
-    (')', 'RPAREN'), ('}', 'RBRACE')
+    ('func', 'FUNC'),
+    ('greet', 'IDENTIFIER'),
+    ('(', 'LPAREN'),
+    ('name', 'IDENTIFIER'),
+    (')', 'RPAREN'),
+    ('{', 'LBRACE'),
+    ('give', 'RETURN'),
+    ('Hello ', 'STRING'),
+    ('+', 'PLUS'),
+    ('name', 'IDENTIFIER'),
+    ('}', 'RBRACE')
 ]
 
 parser = Parser(token)
 parser.parse()
-print(parser.symbols)
 print(parser.output)
