@@ -113,4 +113,3 @@ def lex(words):
 
     return tokens
 
-print(KEYWORDS.keys())

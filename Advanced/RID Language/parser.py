@@ -1,3 +1,4 @@
+
 class Parser:
     def __init__(self, token):
         self.token = token
@@ -19,77 +20,74 @@ class Parser:
             "RETURN": self.return_stmt
         }
 
+
     def parse(self):
         while self.position < len(self.token):
             current_token = self.token[self.position]
             token_type = current_token[1]
-            handler = self.handlers.get(token_type, self.unknown_token)
+
+            if token_type == "IDENTIFIER":
+                if self.position + 1 < len(self.token) and self.token[self.position + 1][1] == "LPAREN":
+                    handler = self.func_call
+                else:
+                    handler = self.assignment
+            else:
+                handler = self.handlers.get(token_type, self.unknown_token)
+
             handler(current_token)
 
+
     def var_declare(self, current_token):
+
         self.position += 1
         var_token = self.token[self.position]
+
         if var_token[1] != "IDENTIFIER":
             raise Exception("Expected identifier after 'LET'")
+
         var_name = var_token[0]
         self.position += 1
+
         if self.token[self.position][1] != "ASSIGN":
             raise Exception("Expected '=' after identifier")
+
         self.position += 1
-        value_token = self.token[self.position]
-        if value_token[1] not in ("NUMBER", "STRING", "BOOL"):
-            raise Exception("Invalid value type in declaration")
-        value = value_token[0]
-        if value_token[1] == "STRING":
-            value = f'"{value}"'
-        self.output.append(f"{var_name} = {value}")
-        self.symbols[var_name] = value
-        self.position += 1
+        expr = self.expression(self.token[self.position])
+
+        self.output.append(f"{var_name} = {expr.strip()}")
+        self.symbols[var_name] = expr
+
 
     def assignment(self, current_token):
         var_name = current_token[0]
+
         if var_name not in self.symbols:
             raise Exception(f"Variable '{var_name}' not declared")
+
         self.position += 1
         if self.token[self.position][1] != "ASSIGN":
             raise Exception("Expected '=' after identifier")
+
         self.position += 1
-        value_token = self.token[self.position]
-        if value_token[1] in ("NUMBER", "BOOL"):
-            value = value_token[0]
-        elif value_token[1] == "STRING":
-            value = f'"{value_token[0]}"'
-        elif value_token[1] == "IDENTIFIER":
-            if value_token[0] not in self.symbols:
-                raise Exception(f"Variable '{value_token[0]}' not declared")
-            value = value_token[0]
-        else:
-            raise Exception("Unsupported value type for assignment")
-        self.symbols[var_name] = value
-        self.output.append(f"{var_name} = {value}")
-        self.position += 1
+        expr = self.expression(self.token[self.position])
+
+        self.symbols[var_name] = expr
+        self.output.append(f"{var_name} = {expr.strip()}")
+
 
     def print_stmt(self, current_token):
         self.position += 1
         if self.token[self.position][1] != "LPAREN":
             raise Exception("Expected '(' after 'OUT'")
         self.position += 1
-        value_token = self.token[self.position]
-        if value_token[1] in ("NUMBER", "BOOL"):
-            value = value_token[0]
-        elif value_token[1] == "STRING":
-            value = f'"{value_token[0]}"'
-        elif value_token[1] == "IDENTIFIER":
-            if value_token[0] not in self.symbols:
-                raise Exception("Undefined variable")
-            value = value_token[0]
-        else:
-            raise Exception("Unexpected datatype")
-        self.position += 1
+
+        value = self.expression(self.token[self.position])
+
         if self.token[self.position][1] != "RPAREN":
             raise Exception("Expected ')' after OUT value")
         self.position += 1
         self.output.append(f"print({value})")
+
 
     def input_stmt(self, current_token):
         self.position += 1
@@ -114,29 +112,58 @@ class Parser:
         else:
             raise Exception("Invalid syntax in input statement")
 
+
     def loop_stmt(self, current_token):
+
         if current_token[1] != "RUN":
             raise Exception("Expected 'RUN'")
         self.position += 1
         next_token = self.token[self.position]
+
         if next_token[1] == "LPAREN":
             self.position += 1
             num_token = self.token[self.position]
+
             if num_token[1] != "NUMBER":
                 raise Exception("Expected number inside Run(...)")
             loop_template = f"for _ in range({num_token[0]}):"
             self.position += 1
+
             if self.token[self.position][1] != "RPAREN":
                 raise Exception("Expected ')' after loop count")
             self.position += 1
+
+            if self.token[self.position][1] != "LBRACE":
+                raise Exception("Expected '{' to start loop block")
+            self.position += 1
+
+            block_lines = self.block(current_token)
+            self.output.append(loop_template)
+            self.output.extend(["    " + line for line in block_lines])
+
+        elif next_token[1] == "WHILE":
+            self.position += 1
+
+            if self.token[self.position][1] != "LPAREN":
+                raise Exception("Expected '(' after 'while'")
+            self.position += 1
+            cond_str = self.condition(self.token[self.position])
+
+            if self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after condition")
+            self.position += 1
+
             if self.token[self.position][1] != "LBRACE":
                 raise Exception("Expected '{' to start loop block")
             self.position += 1
             block_lines = self.block(current_token)
-            self.output.append(loop_template)
+
+            self.output.append(f"while {cond_str}:")
             self.output.extend(["    " + line for line in block_lines])
+
         else:
-            raise Exception("Only RUN with number loop supported so far")
+            raise Exception("Expected '(' or 'while' after RUN")
+
 
     def conditional_stmt(self, current_token):
         keyword = current_token[1]
@@ -165,6 +192,7 @@ class Parser:
         for line in block_lines:
             self.output.append("    " + line)
 
+
     def func_def(self, current_token):
         if current_token[1] != "FUNC":
             raise Exception("Expected 'FUNC'")
@@ -187,16 +215,14 @@ class Parser:
         if self.token[self.position][1] != "LBRACE":
             raise Exception("Expected '{' to start function block")
         self.position += 1
-        # set current parameters
         self.current_params = parameters
         block_lines = self.block(current_token)
         params = ",".join(parameters)
         self.output.append(f"def {func_name}({params}):")
         self.output.extend(["    " + line for line in block_lines])
-        # store function definition
         self.functions[func_name] = {"params": parameters, "body": block_lines}
-        # clear current parameters after block
         self.current_params = []
+
 
     def block(self, current_token):
         block_lines = []
@@ -213,38 +239,22 @@ class Parser:
             self.position += 1
         return block_lines
 
+
     def condition(self, current_token):
-        lhs_token = self.token[self.position]
-        if lhs_token[1] == "IDENTIFIER":
-            if lhs_token[0] not in self.symbols:
-                raise Exception(f"Variable '{lhs_token[0]}' not declared")
-            lhs = lhs_token[0]
-        elif lhs_token[1] in ("NUMBER", "BOOL"):
-            lhs = lhs_token[0]
-        elif lhs_token[1] == "STRING":
-            lhs = f'"{lhs_token[0]}"'
-        else:
-            raise Exception("Unexpected datatype in condition")
-        self.position += 1
+
+        lhs = self.expression(self.token[self.position])
         op_token = self.token[self.position]
         op_map = {"EQ": "==", "NEQ": "!=", "LT": "<", "GT": ">", "LTE": "<=", "GTE": ">="}
+
         if op_token[1] not in op_map:
             raise Exception("Invalid operator in condition")
         op = op_map[op_token[1]]
         self.position += 1
-        rhs_token = self.token[self.position]
-        if rhs_token[1] == "IDENTIFIER":
-            if rhs_token[0] not in self.symbols:
-                raise Exception(f"Variable '{rhs_token[0]}' not declared")
-            rhs = rhs_token[0]
-        elif rhs_token[1] in ("NUMBER", "BOOL"):
-            rhs = rhs_token[0]
-        elif rhs_token[1] == "STRING":
-            rhs = f'"{rhs_token[0]}"'
-        else:
-            raise Exception("Invalid RHS in condition")
-        self.position += 1
+
+        rhs = self.expression(self.token[self.position])
+
         return f"{lhs} {op} {rhs}"
+
 
     def func_call(self, current_token):
         func_name = current_token[0]
@@ -277,49 +287,58 @@ class Parser:
         call_str = f"{func_name}({', '.join(args)})"
         self.output.append(call_str)
 
+
     def return_stmt(self, current_token):
         if current_token[1] != "RETURN":
             raise Exception("Error, expected 'give'")
         self.position += 1
-        expr_parts = []
-        while self.position < len(self.token) and self.token[self.position][1] != "RBRACE":
-            tok = self.token[self.position]
-            if tok[1] == "STRING":
-                expr_parts.append(f'"{tok[0]}"')
-            elif tok[1] in ("NUMBER", "BOOL"):
-                expr_parts.append(str(tok[0]))
-            elif tok[1] == "IDENTIFIER":
-                if tok[0] not in self.symbols and tok[0] not in self.current_params:
-                    raise Exception(f"Undefined variable '{tok[0]}'")
-                expr_parts.append(tok[0])
-            elif tok[1] in ("PLUS", "MINUS", "MUL", "DIV", "MOD"):
-                op_map = {"PLUS":"+","MINUS":"-","MUL":"*","DIV":"/","MOD":"%"}
-                expr_parts.append(op_map[tok[1]])
-            else:
-                break
-            self.position += 1
-        self.output.append(f"return {' '.join(expr_parts)}")
 
-    def unknown_token(self, current_token):
-        raise Exception(f"Unknown token {current_token}")
+        expr = self.expression(self.token[self.position])
+
+        self.output.append(f"return {expr}")
+
 
     def expression(self, current_token):
-        pass
+        expr = ""
+        while self.position < len(self.token):
+            value_token, key_token = self.token[self.position]
 
-    def term(self, current_token):
-        pass
+            if key_token == "NUMBER":
+                expr += f"{value_token} "
+                self.position += 1
 
-    def param_list(self, current_token):
-        pass
+            elif key_token == "STRING":
+                expr += f'"{value_token}" '
+                self.position += 1
 
-    def arg_list(self, current_token):
-        pass
+            elif key_token == "BOOL":
+                expr += f"{value_token} "
+                self.position += 1
+
+            elif key_token == "IDENTIFIER":
+                if value_token not in self.symbols and value_token not in self.current_params:
+                    raise Exception(f"Variable '{value_token}' not declared")
+                expr += f"{value_token} "
+                self.position += 1
+
+            elif key_token in ("PLUS", "MINUS", "MULT", "DIV", "MOD"):
+                expr += f"{value_token} "
+                self.position += 1
+
+            elif key_token in ("RPAREN", "RBRACE"):
+                break
+
+            else:
+                raise Exception(f"Unexpected token in expression: {key_token}")
+
+        return expr.strip()
+
 
     def unknown_token(self, current_token):
         raise Exception(f"Unknown token {current_token}")
 
 
-# Test token
+#Test
 token = [
     ('func', 'FUNC'),
     ('greet', 'IDENTIFIER'),
