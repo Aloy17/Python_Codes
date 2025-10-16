@@ -94,21 +94,31 @@ class Parser:
         if self.token[self.position][1] != "IDENTIFIER":
             raise Exception("Expected variable name after IN")
         var_name = self.token[self.position][0]
+
+        if var_name not in self.symbols:
+            raise Exception(f"Variable '{var_name}' not declared. Use 'Let {var_name} = ...' first")
+
         self.position += 1
+
         if self.token[self.position][1] != "LPAREN":
             raise Exception("Expected '(' after variable name")
+
         self.position += 1
         next_token = self.token[self.position]
+
         if next_token[1] == "RPAREN":
             self.output.append(f"{var_name} = input()")
             self.position += 1
+
         elif next_token[1] == "STRING":
             prompt = f'"{next_token[0]}"'
             self.position += 1
+
             if self.token[self.position][1] != "RPAREN":
                 raise Exception("Expected ')' after input prompt")
             self.output.append(f"{var_name} = input({prompt})")
             self.position += 1
+
         else:
             raise Exception("Invalid syntax in input statement")
 
@@ -166,56 +176,74 @@ class Parser:
 
 
     def conditional_stmt(self, current_token):
+
         keyword = current_token[1]
         if keyword not in ("IF", "ELIF", "ELSE"):
             raise Exception("Expected IF, ELIF, or ELSE")
         self.position += 1
+
         cond_str = ""
         if keyword in ("IF", "ELIF"):
+
             if self.token[self.position][1] != "LPAREN":
                 raise Exception("Expected '(' after conditional keyword")
             self.position += 1
             cond_str = self.condition(self.token[self.position])
+
             if self.token[self.position][1] != "RPAREN":
                 raise Exception("Expected ')' after condition")
             self.position += 1
+
         if self.token[self.position][1] != "LBRACE":
             raise Exception("Expected '{' to start block")
         self.position += 1
         block_lines = self.block(current_token)
+
         if keyword == "IF":
             self.output.append(f"if {cond_str}:")
+
         elif keyword == "ELIF":
             self.output.append(f"elif {cond_str}:")
+
         else:
             self.output.append("else:")
+
         for line in block_lines:
             self.output.append("    " + line)
 
 
     def func_def(self, current_token):
+
         if current_token[1] != "FUNC":
             raise Exception("Expected 'FUNC'")
         self.position += 1
+
         func_name = self.token[self.position][0]
         self.position += 1
+
         if self.token[self.position][1] != "LPAREN":
             raise Exception("Expected '(' after function name")
         self.position += 1
         parameters = []
+
         while self.token[self.position][1] != "RPAREN":
+
             if self.token[self.position][1] == "IDENTIFIER":
                 parameters.append(self.token[self.position][0])
                 self.position += 1
+
             elif self.token[self.position][0] == ",":
                 self.position += 1
+
             else:
                 raise Exception("Invalid token in function parameters")
         self.position += 1
+
         if self.token[self.position][1] != "LBRACE":
             raise Exception("Expected '{' to start function block")
         self.position += 1
         self.current_params = parameters
+
         block_lines = self.block(current_token)
         params = ",".join(parameters)
         self.output.append(f"def {func_name}({params}):")
@@ -226,17 +254,33 @@ class Parser:
 
     def block(self, current_token):
         block_lines = []
+
         while self.position < len(self.token) and self.token[self.position][1] != "RBRACE":
             current_token = self.token[self.position]
             token_type = current_token[1]
-            handler = self.handlers.get(token_type, self.unknown_token)
+
+            if token_type == "IDENTIFIER":
+
+                if self.position + 1 < len(self.token) and self.token[self.position + 1][1] == "LPAREN":
+                    handler = self.func_call
+                else:
+                    handler = self.assignment
+
+            else:
+                handler = self.handlers.get(token_type, self.unknown_token)
+
             old_output = self.output
             self.output = []
             handler(current_token)
             block_lines.extend(self.output)
             self.output = old_output
+
         if self.position < len(self.token) and self.token[self.position][1] == "RBRACE":
             self.position += 1
+
+        if len(block_lines) == 0:
+            block_lines.append("pass")
+
         return block_lines
 
 
@@ -255,33 +299,48 @@ class Parser:
 
         return f"{lhs} {op} {rhs}"
 
-
     def func_call(self, current_token):
         func_name = current_token[0]
+
         if func_name not in self.functions:
             raise Exception(f"Function '{func_name}' not defined")
         self.position += 1
+
         if self.token[self.position][1] != "LPAREN":
             raise Exception("Expected '(' after function name")
         self.position += 1
         args = []
+
         while self.position < len(self.token) and self.token[self.position][1] != "RPAREN":
             arg_token = self.token[self.position]
+
             if arg_token[1] in ("NUMBER", "BOOL"):
                 args.append(str(arg_token[0]))
+
             elif arg_token[1] == "STRING":
                 args.append(f'"{arg_token[0]}"')
+
             elif arg_token[1] == "IDENTIFIER":
+
                 if arg_token[0] in self.symbols or arg_token[0] in self.current_params:
                     args.append(arg_token[0])
                 else:
                     raise Exception(f"Variable '{arg_token[0]}' not declared")
+
             else:
                 raise Exception(f"Unsupported argument type: {arg_token[1]}")
             self.position += 1
-            if self.position < len(self.token) and self.token[self.position][0] == ",":
+
+            if self.position < len(self.token) and self.token[self.position][1] != "RPAREN":
+
+                if self.token[self.position][0] != ",":
+                    raise Exception("Expected ',' between function arguments")
                 self.position += 1
-        if self.token[self.position][1] != "RPAREN":
+
+                if self.position < len(self.token) and self.token[self.position][1] == "RPAREN":
+                    raise Exception("Trailing comma not allowed in function arguments")
+
+        if self.position >= len(self.token) or self.token[self.position][1] != "RPAREN":
             raise Exception("Expected ')' after function arguments")
         self.position += 1
         call_str = f"{func_name}({', '.join(args)})"
@@ -289,6 +348,7 @@ class Parser:
 
 
     def return_stmt(self, current_token):
+
         if current_token[1] != "RETURN":
             raise Exception("Error, expected 'give'")
         self.position += 1
@@ -299,40 +359,104 @@ class Parser:
 
 
     def expression(self, current_token):
-        expr = ""
-        while self.position < len(self.token):
-            value_token, key_token = self.token[self.position]
+        return self.parse_additive()
 
-            if key_token == "NUMBER":
-                expr += f"{value_token} "
-                self.position += 1
+    def parse_additive(self):
+        left = self.parse_multiplicative()
 
-            elif key_token == "STRING":
-                expr += f'"{value_token}" '
-                self.position += 1
+        while self.position < len(self.token) and self.token[self.position][1] in ("PLUS", "MINUS"):
+            op = self.token[self.position][0]
+            self.position += 1
+            right = self.parse_multiplicative()
+            left = f"{left} {op} {right}"
 
-            elif key_token == "BOOL":
-                expr += f"{value_token} "
-                self.position += 1
+        return left
 
-            elif key_token == "IDENTIFIER":
-                if value_token not in self.symbols and value_token not in self.current_params:
-                    raise Exception(f"Variable '{value_token}' not declared")
-                expr += f"{value_token} "
-                self.position += 1
 
-            elif key_token in ("PLUS", "MINUS", "MULT", "DIV", "MOD"):
-                expr += f"{value_token} "
-                self.position += 1
+    def parse_multiplicative(self):
+        left = self.parse_primary()
 
-            elif key_token in ("RPAREN", "RBRACE"):
-                break
+        while self.position < len(self.token) and self.token[self.position][1] in ("MULT", "DIV", "MOD"):
+            op = self.token[self.position][0]
+            self.position += 1
+            right = self.parse_primary()
+            left = f"{left} {op} {right}"
+
+        return left
+
+
+    def parse_primary(self):
+
+        if self.position >= len(self.token):
+            raise Exception("Unexpected end of expression")
+
+        current = self.token[self.position]
+        value_token, key_token = current
+
+        if key_token == "NUMBER":
+            self.position += 1
+            return value_token
+
+        elif key_token == "STRING":
+            self.position += 1
+            return f'"{value_token}"'
+
+        elif key_token == "BOOL":
+            self.position += 1
+            return value_token
+
+        elif key_token == "IDENTIFIER":
+
+            if self.position + 1 < len(self.token) and self.token[self.position + 1][1] == "LPAREN":
+                return self.parse_function_call()
 
             else:
-                raise Exception(f"Unexpected token in expression: {key_token}")
+                if value_token not in self.symbols and value_token not in self.current_params:
+                    raise Exception(f"Variable '{value_token}' not declared")
+                self.position += 1
+                return value_token
 
-        return expr.strip()
+        elif key_token == "LPAREN":
+            self.position += 1
+            expr = self.parse_additive()
 
+            if self.position >= len(self.token) or self.token[self.position][1] != "RPAREN":
+                raise Exception("Expected ')' after expression")
+            self.position += 1
+            return f"({expr})"
+
+        else:
+            raise Exception(f"Unexpected token in expression: {key_token}")
+
+    def parse_function_call(self):
+        func_name = self.token[self.position][0]
+
+        if func_name not in self.functions:
+            raise Exception(f"Function '{func_name}' not defined")
+        self.position += 1
+
+        if self.token[self.position][1] != "LPAREN":
+            raise Exception("Expected '(' after function name")
+        self.position += 1
+
+        args = []
+
+        while self.position < len(self.token) and self.token[self.position][1] != "RPAREN":
+            arg_expr = self.parse_additive()
+            args.append(arg_expr)
+
+            if self.position < len(self.token) and self.token[self.position][1] != "RPAREN":
+                if self.token[self.position][0] != ",":
+                    raise Exception("Expected ',' between function arguments")
+                self.position += 1
+                if self.position < len(self.token) and self.token[self.position][1] == "RPAREN":
+                    raise Exception("Trailing comma not allowed in function arguments")
+
+        if self.position >= len(self.token) or self.token[self.position][1] != "RPAREN":
+            raise Exception("Expected ')' after function arguments")
+        self.position += 1
+
+        return f"{func_name}({', '.join(args)})"
 
 
     def unknown_token(self, current_token):
@@ -341,16 +465,27 @@ class Parser:
 
 #Test
 token = [
-    ('func', 'FUNC'),
-    ('greet', 'IDENTIFIER'),
+    ('Let', 'LET'),
+    ('x', 'IDENTIFIER'),
+    ('=', 'ASSIGN'),
+    ('0', 'NUMBER'),
+    ('Run', 'RUN'),
+    ('while', 'WHILE'),
     ('(', 'LPAREN'),
-    ('name', 'IDENTIFIER'),
+    ('x', 'IDENTIFIER'),
+    ('<', 'LT'),
+    ('3', 'NUMBER'),
     (')', 'RPAREN'),
     ('{', 'LBRACE'),
-    ('give', 'RETURN'),
-    ('Hello ', 'STRING'),
+    ('out', 'OUT'),
+    ('(', 'LPAREN'),
+    ('x', 'IDENTIFIER'),
+    (')', 'RPAREN'),
+    ('x', 'IDENTIFIER'),
+    ('=', 'ASSIGN'),
+    ('x', 'IDENTIFIER'),
     ('+', 'PLUS'),
-    ('name', 'IDENTIFIER'),
+    ('1', 'NUMBER'),
     ('}', 'RBRACE')
 ]
 
